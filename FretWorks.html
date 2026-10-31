@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FretWorks - Guitar Repair & Resale Tracker</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        amber: {
+                            500: '#f59e0b',
+                            600: '#d97706',
+                            700: '#b45309',
+                        },
+                        wood: {
+                            800: '#2c1d11',
+                            900: '#1a100a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col">
+
+    <!-- Header Navigation -->
+    <header class="bg-gray-900 border-b border-gray-800 sticky top-0 z-30 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-gray-950 text-xl font-bold shadow-md">
+                    <i class="fa-solid fa-guitar"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                        FretWorks <span class="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono">LK</span>
+                    </h1>
+                    <p class="text-xs text-gray-400">Guitar Workshop & Resale Analytics (LKR)</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <button onclick="exportJSON()" class="px-3 py-1.5 text-xs font-medium bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg border border-gray-700 flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-download"></i> Backup Data
+                </button>
+                <label class="px-3 py-1.5 text-xs font-medium bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg border border-gray-700 flex items-center gap-1.5 cursor-pointer transition">
+                    <i class="fa-solid fa-upload"></i> Restore
+                    <input type="file" id="importFileInput" accept=".json" class="hidden" onchange="importJSON(event)">
+                </label>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full space-y-8">
+        
+        <!-- Tab Controls -->
+        <div class="flex border-b border-gray-800 space-x-4 overflow-x-auto">
+            <button id="tabBtnNew" onclick="switchTab('new')" class="px-4 py-2.5 text-sm font-semibold border-b-2 border-amber-500 text-amber-500 flex items-center gap-2 transition whitespace-nowrap">
+                <i class="fa-solid fa-plus-circle"></i> Add New Flip / Prospect
+            </button>
+            <button id="tabBtnWatchlist" onclick="switchTab('watchlist')" class="px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-200 flex items-center gap-2 transition whitespace-nowrap">
+                <i class="fa-solid fa-eye text-sky-400"></i> Market Watchlist (<span id="watchCount">0</span>)
+            </button>
+            <button id="tabBtnInventory" onclick="switchTab('inventory')" class="px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-200 flex items-center gap-2 transition whitespace-nowrap">
+                <i class="fa-solid fa-boxes-stacked"></i> Workshop Inventory (<span id="invCount">0</span>)
+            </button>
+            <button id="tabBtnCatalog" onclick="switchTab('catalog')" class="px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-200 flex items-center gap-2 transition whitespace-nowrap">
+                <i class="fa-solid fa-tags text-emerald-400"></i> Price Catalog (<span id="catalogCount">0</span>)
+            </button>
+            <button id="tabBtnAnalytics" onclick="switchTab('analytics')" class="px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-200 flex items-center gap-2 transition whitespace-nowrap">
+                <i class="fa-solid fa-chart-line"></i> Sales & Profit Analytics
+            </button>
+        </div>
+
+        <!-- SECTION 1: NEW GUITAR ENTRY FORM -->
+        <section id="sectionNew" class="space-y-6">
+            <form id="guitarForm" onsubmit="handleFormSubmit(event)" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                <!-- Left Column: Specs & Images -->
+                <div class="lg:col-span-7 bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-5 shadow-sm">
+                    <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+                        <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-wrench text-amber-500"></i> Instrument Info & Location
+                        </h2>
+                        <!-- Mode Selector: Watchlist vs Direct Purchase -->
+                        <div class="flex bg-gray-950 p-1 rounded-lg border border-gray-800">
+                            <label class="cursor-pointer text-xs px-2.5 py-1 rounded font-medium text-gray-400 has-[:checked]:bg-sky-500/20 has-[:checked]:text-sky-400 transition">
+                                <input type="radio" name="entryMode" value="WATCHLIST" checked onchange="toggleEntryMode()" class="hidden">
+                                <i class="fa-solid fa-eye mr-1"></i> Watchlist Prospect
+                            </label>
+                            <label class="cursor-pointer text-xs px-2.5 py-1 rounded font-medium text-gray-400 has-[:checked]:bg-amber-500/20 has-[:checked]:text-amber-400 transition">
+                                <input type="radio" name="entryMode" value="INVENTORY" onchange="toggleEntryMode()" class="hidden">
+                                <i class="fa-solid fa-cart-shopping mr-1"></i> Purchased Inventory
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-400 mb-1">Brand *</label>
+                            <input type="text" id="brand" required placeholder="e.g. Fender, Squier, Ibanez, Yamaha" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-400 mb-1">Model *</label>
+                            <input type="text" id="model" required placeholder="e.g. Stratocaster, Pacifica, RG350" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-400 mb-1">Location / City in Sri Lanka *</label>
+                            <input type="text" id="locationCity" list="cityPresets" required placeholder="e.g. Colombo, Kandy, Gampaha, Negombo" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                            <datalist id="cityPresets">
+                                <option value="Colombo">
+                                <option value="Gampaha">
+                                <option value="Kandy">
+                                <option value="Negombo">
+                                <option value="Kurunegala">
+                                <option value="Galle">
+                                <option value="Dehiwala / Mt. Lavinia">
+                                <option value="Battaramulla">
+                            </datalist>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-400 mb-1">Sourcing Site / Seller Link *</label>
+                            <input type="text" id="sourcingChannel" list="sourcingPresets" required placeholder="e.g. ikman.lk, FB Marketplace, Local Seller" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                            <datalist id="sourcingPresets">
+                                <option value="ikman.lk">
+                                <option value="Facebook Marketplace">
+                                <option value="Riyasewana / Local Ads">
+                                <option value="Friend / Musician">
+                                <option value="Pawn Shop / Vintage Market">
+                                <option value="Yamaha Music Centre / Local Store">
+                            </datalist>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-400 mb-1">Serial Number / Year</label>
+                            <input type="text" id="serial" placeholder="e.g. MX12345678 (2018)" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-400 mb-1">Log Date *</label>
+                            <input type="date" id="purchaseDate" required class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                        </div>
+                    </div>
+
+                    <!-- Image Uploader -->
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1">Guitar Photos / Listing Screenshots</label>
+                        <div class="border-2 border-dashed border-gray-700 hover:border-amber-500/50 rounded-lg p-4 text-center cursor-pointer bg-gray-950/50 transition relative" onclick="document.getElementById('imageInput').click()">
+                            <i class="fa-solid fa-camera text-2xl text-gray-500 mb-1"></i>
+                            <p class="text-xs text-gray-400">Click to upload listing photos or neck/body details</p>
+                            <input type="file" id="imageInput" multiple accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                        </div>
+                        <div id="imagePreviewContainer" class="flex flex-wrap gap-2 mt-3"></div>
+                    </div>
+
+                    <!-- Repair Notes & Assessment -->
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1">Diagnostic Notes & Seller Comments</label>
+                        <textarea id="repairNotes" rows="4" placeholder="Detail notes: Seller asking price negotiable? Needs new pots, wiring repair, neck setup, fret polish, missing tremolo arm..." class="w-full bg-gray-950 border border-gray-700 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-amber-500"></textarea>
+                    </div>
+                </div>
+
+                <!-- Right Column: Cost, Parts & Target Selling Price -->
+                <div class="lg:col-span-5 bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-5 shadow-sm flex flex-col justify-between">
+                    <div class="space-y-4">
+                        <h2 class="text-lg font-semibold text-white flex items-center gap-2 border-b border-gray-800 pb-3">
+                            <i class="fa-solid fa-calculator text-amber-500"></i> Cost & Profit Estimation
+                        </h2>
+
+                        <!-- Purchase / Asking Price -->
+                        <div>
+                            <label id="askingPriceLabel" class="block text-xs font-medium text-gray-400 mb-1">Seller Asking Price (LKR / Rs.) *</label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-2.5 text-gray-500 text-xs">Rs.</span>
+                                <input type="number" step="100" min="0" id="purchasePrice" required placeholder="0" oninput="calculateTotals()" class="w-full bg-gray-950 border border-gray-700 rounded-lg pl-9 pr-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                            </div>
+                        </div>
+
+                        <!-- Itemized Repair Parts -->
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="text-xs font-medium text-gray-400">Estimated Repair Parts & Accessories</label>
+                                <button type="button" onclick="addPartRow()" class="text-xs text-amber-500 hover:text-amber-400 font-medium flex items-center gap-1">
+                                    <i class="fa-solid fa-plus"></i> Add Item
+                                </button>
+                            </div>
+
+                            <!-- Parts & Accessories Quick Selector Buttons -->
+                            <div id="quickCatalogButtons" class="flex flex-wrap gap-1.5 mb-3 max-h-24 overflow-y-auto p-1 bg-gray-950/40 rounded border border-gray-800">
+                                <!-- Dynamically generated from master catalog -->
+                            </div>
+
+                            <div id="partsList" class="space-y-2 max-h-48 overflow-y-auto pr-1"></div>
+                        </div>
+
+                        <!-- Target Profit Calculator -->
+                        <div class="pt-3 border-t border-gray-800 space-y-3">
+                            <label class="block text-xs font-medium text-gray-400">Target Profit Margin Strategy</label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <span class="text-[11px] text-gray-500 block mb-1">Desired Margin (%)</span>
+                                    <input type="number" id="targetMarginPct" value="35" step="1" min="0" oninput="calculateTotals('pct')" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-500">
+                                </div>
+                                <div>
+                                    <span class="text-[11px] text-gray-500 block mb-1">Or Target Profit (Rs.)</span>
+                                    <input type="number" id="targetMarginDollar" value="0" step="500" min="0" oninput="calculateTotals('dollar')" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-500">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Totals Summary Card -->
+                        <div class="bg-gray-950 p-4 rounded-lg border border-gray-800 space-y-2">
+                            <div class="flex justify-between text-xs text-gray-400">
+                                <span>Estimated Total Investment:</span>
+                                <span id="totalExpenseDisplay" class="font-semibold text-gray-200">Rs. 0.00</span>
+                            </div>
+                            <div class="flex justify-between text-xs text-gray-400">
+                                <span>Projected Flip Profit:</span>
+                                <span id="projectedProfitDisplay" class="font-semibold text-emerald-400">Rs. 0.00</span>
+                            </div>
+                            <div class="flex justify-between text-base font-bold text-white pt-2 border-t border-gray-800">
+                                <span class="text-amber-500">Target Market Price:</span>
+                                <span id="recommendedPriceDisplay" class="text-amber-400">Rs. 0.00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="saveSubmitBtn" class="w-full mt-4 bg-sky-600 hover:bg-sky-500 text-gray-950 font-bold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2 transition">
+                        <i class="fa-solid fa-eye"></i> Add Guitar to Market Watchlist
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- SECTION 2: WATCHLIST PROSPECT CARDS -->
+        <section id="sectionWatchlist" class="space-y-4 hidden">
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <div class="relative w-full sm:w-64">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-500 text-sm"></i>
+                        <input type="text" id="searchWatchlist" oninput="renderWatchlist()" placeholder="Search brand, model, city, notes..." class="w-full bg-gray-950 border border-gray-700 rounded-lg pl-9 pr-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-500">
+                    </div>
+                </div>
+                <div class="text-xs text-gray-400">
+                    Watching <span id="visibleWatchCount" class="text-white font-bold">0</span> candidate guitars
+                </div>
+            </div>
+
+            <div id="watchlistContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        </section>
+
+        <!-- SECTION 3: WORKSHOP INVENTORY TABLE & CARDS -->
+        <section id="sectionInventory" class="space-y-4 hidden">
+            <!-- Filter Bar -->
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <div class="relative w-full sm:w-64">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-500 text-sm"></i>
+                        <input type="text" id="searchInventory" oninput="renderInventory()" placeholder="Search brand, model, notes..." class="w-full bg-gray-950 border border-gray-700 rounded-lg pl-9 pr-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-500">
+                    </div>
+                    <select id="filterStatus" onchange="renderInventory()" class="bg-gray-950 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-500">
+                        <option value="ALL">All Statuses</option>
+                        <option value="In Repair">In Repair</option>
+                        <option value="Ready for Sale">Ready for Sale</option>
+                        <option value="Sold">Sold</option>
+                    </select>
+                </div>
+                <div class="text-xs text-gray-400">
+                    Showing <span id="visibleCount" class="text-white font-bold">0</span> guitars
+                </div>
+            </div>
+
+            <!-- Inventory Grid -->
+            <div id="inventoryContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        </section>
+
+        <!-- SECTION 4: MASTER PARTS & ACCESSORIES PRICE CATALOG -->
+        <section id="sectionCatalog" class="space-y-6 hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Add / Edit Part Form -->
+                <div class="lg:col-span-5 bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4 shadow-sm">
+                    <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+                        <h3 class="text-lg font-bold text-white flex items-center gap-2" id="catalogFormTitle">
+                            <i class="fa-solid fa-plus-circle text-emerald-400"></i> Add Item to Price Catalog
+                        </h3>
+                        <button type="button" id="cancelCatalogEditBtn" onclick="resetCatalogForm()" class="hidden text-xs text-gray-400 hover:text-white">
+                            Cancel Edit
+                        </button>
+                    </div>
+
+                    <form id="catalogForm" onsubmit="handleCatalogSubmit(event)" class="space-y-4">
+                        <input type="hidden" id="catalogEditId" value="">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-400 mb-1">Item Name / Specification *</label>
+                            <input type="text" id="catalogItemName" required placeholder="e.g. CTS 500k Pot, Ernie Ball 10-46, Padded Gig Bag" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-400 mb-1">Category *</label>
+                                <select id="catalogCategory" required class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                                    <option value="Electronics">Electronics (Pots, Jacks, Switches)</option>
+                                    <option value="Strings">Strings & Care</option>
+                                    <option value="Hardware">Hardware (Bridges, Tuners, Knobs)</option>
+                                    <option value="Frets & Neck">Frets, Nuts & Trusses</option>
+                                    <option value="Accessories">Accessories (Gig Bag, Strap, Capo)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-400 mb-1">Default Cost (LKR / Rs.) *</label>
+                                <input type="number" id="catalogDefaultPrice" step="50" min="0" required placeholder="0" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                            </div>
+                        </div>
+
+                        <button type="submit" id="catalogSubmitBtn" class="w-full bg-emerald-600 hover:bg-emerald-500 text-gray-950 font-bold py-2.5 rounded-lg shadow flex items-center justify-center gap-2 transition">
+                            <i class="fa-solid fa-save"></i> Save to Price Catalog
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Catalog List Table -->
+                <div class="lg:col-span-7 bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4 shadow-sm">
+                    <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+                        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-list-check text-emerald-400"></i> Master Parts & Accessories Catalog
+                        </h3>
+                        <span class="text-xs text-gray-400">Click edit to update default costs</span>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="text-[11px] text-gray-400 border-b border-gray-800 uppercase tracking-wider">
+                                    <th class="pb-2 font-medium">Item Name</th>
+                                    <th class="pb-2 font-medium">Category</th>
+                                    <th class="pb-2 font-medium text-right">Default Cost</th>
+                                    <th class="pb-2 font-medium text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="catalogTableBody" class="divide-y divide-gray-800/60 text-xs text-gray-300">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 5: ANALYTICS DASHBOARD -->
+        <section id="sectionAnalytics" class="space-y-6 hidden">
+            <!-- Key Metric Overview -->
+            <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                <div class="bg-gray-900 border border-gray-800 p-4 rounded-xl">
+                    <p class="text-xs text-gray-400 font-medium">Total Invested</p>
+                    <p id="metricInvested" class="text-xl font-bold text-white mt-1">Rs. 0.00</p>
+                    <p class="text-[10px] text-gray-500 mt-1">Across all instruments</p>
+                </div>
+                <div class="bg-gray-900 border border-gray-800 p-4 rounded-xl">
+                    <p class="text-xs text-gray-400 font-medium">Total Revenue</p>
+                    <p id="metricRevenue" class="text-xl font-bold text-amber-400 mt-1">Rs. 0.00</p>
+                    <p class="text-[10px] text-gray-500 mt-1">From completed flips</p>
+                </div>
+                <div class="bg-gray-900 border border-gray-800 p-4 rounded-xl">
+                    <p class="text-xs text-gray-400 font-medium">Net Realized Profit</p>
+                    <p id="metricProfit" class="text-xl font-bold text-emerald-400 mt-1">Rs. 0.00</p>
+                    <p class="text-[10px] text-gray-500 mt-1">After parts & courier fees</p>
+                </div>
+                <div class="bg-gray-900 border border-gray-800 p-4 rounded-xl">
+                    <p class="text-xs text-gray-400 font-medium">Average ROI</p>
+                    <p id="metricROI" class="text-xl font-bold text-indigo-400 mt-1">0%</p>
+                    <p class="text-[10px] text-gray-500 mt-1">Return on total expenses</p>
+                </div>
+                <div class="bg-gray-900 border border-gray-800 p-4 rounded-xl">
+                    <p class="text-xs text-gray-400 font-medium">Flips Completed</p>
+                    <p id="metricCount" class="text-xl font-bold text-white mt-1">0</p>
+                    <p class="text-[10px] text-gray-500 mt-1">Guitars marked as sold</p>
+                </div>
+            </div>
+
+            <!-- Sourcing Channel Analytics Section -->
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
+                <h3 class="text-sm font-semibold text-gray-200 flex items-center justify-between border-b border-gray-800 pb-3">
+                    <span class="flex items-center gap-2"><i class="fa-solid fa-magnifying-glass-location text-amber-500"></i> Top Sourcing Sites & Channels Breakdown</span>
+                    <span class="text-xs text-gray-400 font-normal">Identifies best platforms for finding profitable guitars</span>
+                </h3>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="text-[11px] text-gray-400 border-b border-gray-800 uppercase tracking-wider">
+                                <th class="pb-2 font-medium">Sourcing Channel / Site</th>
+                                <th class="pb-2 font-medium text-center">Guitars Bought</th>
+                                <th class="pb-2 font-medium text-center">Flips Sold</th>
+                                <th class="pb-2 font-medium text-right">Total Invested (Rs.)</th>
+                                <th class="pb-2 font-medium text-right">Net Profit (Rs.)</th>
+                                <th class="pb-2 font-medium text-right">Channel ROI</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sourcingTableBody" class="divide-y divide-gray-800/60 text-xs text-gray-300">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Charts Row 1 -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Profit/Loss Per Guitar -->
+                <div class="lg:col-span-8 bg-gray-900 border border-gray-800 rounded-xl p-5">
+                    <h3 class="text-sm font-semibold text-gray-200 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-bar text-amber-500"></i> Profit / Loss per Guitar (Rs.)
+                    </h3>
+                    <div class="h-64 relative">
+                        <canvas id="chartProfitPerGuitar"></canvas>
+                    </div>
+                </div>
+
+                <!-- Donut Chart: Expenses vs Net Profit -->
+                <div class="lg:col-span-4 bg-gray-900 border border-gray-800 rounded-xl p-5">
+                    <h3 class="text-sm font-semibold text-gray-200 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-pie text-amber-500"></i> Overall Capital Allocation
+                    </h3>
+                    <div class="h-64 relative flex items-center justify-center">
+                        <canvas id="chartCapitalBreakdown"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MARK AS SOLD MODAL -->
+    <div id="soldModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-gray-900 border border-gray-800 w-full max-w-md rounded-xl p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-dollar-sign text-emerald-400"></i> Record Guitar Sale
+                </h3>
+                <button onclick="closeSoldModal()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Actual Selling Price (Rs.) *</label>
+                    <input type="number" id="modalSalePrice" step="100" required placeholder="0.00" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Platform, Courier & Delivery Fees (Rs.)</label>
+                    <input type="number" id="modalFees" step="50" value="0.00" placeholder="e.g. Courier delivery fee / listing fee" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Sale Date</label>
+                    <input type="date" id="modalSaleDate" required class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Buyer & Sale Notes</label>
+                    <input type="text" id="modalBuyerNotes" placeholder="e.g. Hand delivered in Colombo / Sold via FB group" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button onclick="closeSoldModal()" class="w-1/2 py-2 text-sm bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium">Cancel</button>
+                <button onclick="saveGuitarSale()" class="w-1/2 py-2 text-sm bg-emerald-600 hover:bg-emerald-500 text-gray-950 font-bold rounded-lg shadow">Confirm Sale</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT APPLICATION LOGIC -->
+    <script>
+        // Global Application State
+        let inventory = [];
+        let watchlist = [];
+        let catalog = [];
+        let uploadedImages = [];
+        let selectedGuitarIdForSale = null;
+
+        // Chart instances
+        let barChartInstance = null;
+        let pieChartInstance = null;
+
+        // On Application Load
+        window.onload = function() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('purchaseDate').value = today;
+            document.getElementById('modalSaleDate').value = today;
+
+            loadFromLocalStorage();
+
+            if (catalog.length === 0) {
+                seedDefaultCatalog();
+            }
+
+            if (inventory.length === 0 && watchlist.length === 0) {
+                seedSampleData();
+            }
+
+            addPartRow();
+            renderCatalogButtons();
+            renderCatalogTable();
+            renderWatchlist();
+            renderInventory();
+            updateAnalytics();
+        };
+
+        // --- CALCULATION & DYNAMIC PARTS LOGIC ---
+        function calculateTotals(mode = 'pct') {
+            const purchasePrice = parseFloat(document.getElementById('purchasePrice').value) || 0;
+            
+            // Sum all parts from partsList
+            let partsTotal = 0;
+            const partCosts = document.querySelectorAll('.part-cost');
+            partCosts.forEach(input => {
+                partsTotal += parseFloat(input.value) || 0;
+            });
+
+            const totalExpense = purchasePrice + partsTotal;
+            document.getElementById('totalExpenseDisplay').innerText = formatLKR(totalExpense);
+
+            const pctInput = document.getElementById('targetMarginPct');
+            const dollarInput = document.getElementById('targetMarginDollar');
+
+            let profit = 0;
+            if (mode === 'pct') {
+                const pct = parseFloat(pctInput.value) || 0;
+                profit = totalExpense * (pct / 100);
+                dollarInput.value = Math.round(profit);
+            } else {
+                profit = parseFloat(dollarInput.value) || 0;
+                if (totalExpense > 0) {
+                    pctInput.value = Math.round((profit / totalExpense) * 100);
+                }
+            }
+
+            const targetSellingPrice = totalExpense + profit;
+            document.getElementById('projectedProfitDisplay').innerText = formatLKR(profit);
+            document.getElementById('recommendedPriceDisplay').innerText = formatLKR(targetSellingPrice);
+        }
+
+        function addPartRow(name = '', cost = '') {
+            const container = document.getElementById('partsList');
+            if (!container) return;
+            const rowId = 'part_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+
+            const row = document.createElement('div');
+            row.id = rowId;
+            row.className = "flex items-center gap-2 bg-gray-950 p-2 rounded-lg border border-gray-800";
+            row.innerHTML = `
+                <div class="flex-grow">
+                    <input type="text" list="catalogDataList" placeholder="Select or type part/accessory" value="${name}" onchange="autoFillCatalogPrice(this)" class="part-name w-full bg-gray-900 border border-gray-700 rounded px-2.5 py-1 text-xs text-white focus:outline-none focus:border-amber-500">
+                    <datalist id="catalogDataList">
+                        ${catalog.map(c => `<option value="${c.name}">${c.name} (${formatLKR(c.price)})</option>`).join('')}
+                    </datalist>
+                </div>
+                <div class="w-32 relative">
+                    <span class="absolute left-2 top-1.5 text-gray-500 text-[10px]">Rs.</span>
+                    <input type="number" step="50" min="0" placeholder="0" value="${cost}" oninput="calculateTotals()" class="part-cost w-full bg-gray-900 border border-gray-700 rounded pl-7 pr-2 py-1 text-xs text-white focus:outline-none focus:border-amber-500 text-right">
+                </div>
+                <button type="button" onclick="removePartRow('${rowId}')" class="text-gray-500 hover:text-red-400 text-xs px-1.5 py-1">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            `;
+            container.appendChild(row);
+            calculateTotals();
+        }
+
+        function autoFillCatalogPrice(inputElem) {
+            const val = inputElem.value.trim();
+            const found = catalog.find(c => c.name.toLowerCase() === val.toLowerCase());
+            if (found) {
+                const costInput = inputElem.closest('div.flex').querySelector('.part-cost');
+                if (costInput) {
+                    costInput.value = found.price;
+                }
+            }
+            calculateTotals();
+        }
+
+        function quickAddPart(name, defaultCost) {
+            addPartRow(name, defaultCost);
+        }
+
+        function removePartRow(rowId) {
+            const row = document.getElementById(rowId);
+            if (row) {
+                row.remove();
+                calculateTotals();
+            }
+        }
+
+        function handleImageUpload(e) {
+            const files = Array.from(e.target.files);
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    uploadedImages.push(event.target.result);
+                    renderImagePreviews();
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function renderImagePreviews() {
+            const container = document.getElementById('imagePreviewContainer');
+            container.innerHTML = '';
+            uploadedImages.forEach((src, idx) => {
+                const div = document.createElement('div');
+                div.className = "relative w-16 h-16 rounded-lg overflow-hidden border border-gray-700 bg-gray-900";
+                div.innerHTML = `
+                    <img src="${src}" class="w-full h-full object-cover">
+                    <button type="button" onclick="removeImage(${idx})" class="absolute top-0 right-0 bg-red-600/80 text-white p-0.5 text-[10px] w-4 h-4 flex items-center justify-center">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function removeImage(index) {
+            uploadedImages.splice(index, 1);
+            renderImagePreviews();
+        }
+
+        function toggleEntryMode() {
+            const mode = document.querySelector('input[name="entryMode"]:checked').value;
+            const btn = document.getElementById('saveSubmitBtn');
+            const askingLabel = document.getElementById('askingPriceLabel');
+
+            if (mode === 'WATCHLIST') {
+                btn.className = "w-full mt-4 bg-sky-600 hover:bg-sky-500 text-gray-950 font-bold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2 transition";
+                btn.innerHTML = `<i class="fa-solid fa-eye"></i> Add Guitar to Market Watchlist`;
+                askingLabel.innerText = "Seller Asking Price (LKR / Rs.) *";
+            } else {
+                btn.className = "w-full mt-4 bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2 transition";
+                btn.innerHTML = `<i class="fa-solid fa-boxes-stacked"></i> Add Guitar to Workshop Inventory`;
+                askingLabel.innerText = "Purchase Price (LKR / Rs.) *";
+            }
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            const mode = document.querySelector('input[name="entryMode"]:checked').value;
+            
+            const brand = document.getElementById('brand').value.trim();
+            const model = document.getElementById('model').value.trim();
+            const locationCity = document.getElementById('locationCity').value.trim();
+            const sourcingChannel = document.getElementById('sourcingChannel').value.trim();
+            const serial = document.getElementById('serial').value.trim();
+            const purchaseDate = document.getElementById('purchaseDate').value;
+            const purchasePrice = parseFloat(document.getElementById('purchasePrice').value) || 0;
+            const repairNotes = document.getElementById('repairNotes').value.trim();
+
+            const parts = [];
+            const rows = document.querySelectorAll('#partsList > div');
+            rows.forEach(r => {
+                const name = r.querySelector('.part-name').value.trim();
+                const cost = parseFloat(r.querySelector('.part-cost').value) || 0;
+                if (name || cost > 0) {
+                    parts.push({ name: name || 'Unspecified Part', cost });
+                }
+            });
+
+            const partsTotal = parts.reduce((sum, p) => sum + p.cost, 0);
+            const totalExpense = purchasePrice + partsTotal;
+
+            const marginPct = parseFloat(document.getElementById('targetMarginPct').value) || 0;
+            const targetSellingPrice = totalExpense + (totalExpense * (marginPct / 100));
+
+            const newGuitar = {
+                id: 'gt_' + Date.now(),
+                brand,
+                model,
+                locationCity,
+                sourcingChannel,
+                serial,
+                purchaseDate,
+                purchasePrice,
+                repairNotes,
+                images: uploadedImages.length > 0 ? [...uploadedImages] : ['https://images.unsplash.com/photo-1550985616-10810253b84d?auto=format&fit=crop&w=600&q=80'],
+                parts,
+                totalExpense,
+                targetSellingPrice,
+                status: mode === 'WATCHLIST' ? 'Watchlist' : 'In Repair'
+            };
+
+            if (mode === 'WATCHLIST') {
+                watchlist.push(newGuitar);
+                switchTab('watchlist');
+            } else {
+                inventory.push(newGuitar);
+                switchTab('inventory');
+            }
+
+            saveToLocalStorage();
+            resetForm();
+            updateAnalytics();
+        }
+
+        function resetForm() {
+            document.getElementById('guitarForm').reset();
+            document.getElementById('partsList').innerHTML = '';
+            uploadedImages = [];
+            renderImagePreviews();
+            addPartRow();
+            calculateTotals();
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('purchaseDate').value = today;
+        }
+
+        function formatLKR(amount) {
+            return 'Rs. ' + amount.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function renderWatchlist() {
+            const container = document.getElementById('watchlistContainer');
+            if (!container) return;
+            const searchQuery = document.getElementById('searchWatchlist') ? document.getElementById('searchWatchlist').value.toLowerCase() : '';
+
+            const filtered = watchlist.filter(g => {
+                return g.brand.toLowerCase().includes(searchQuery) ||
+                       g.model.toLowerCase().includes(searchQuery) ||
+                       (g.locationCity && g.locationCity.toLowerCase().includes(searchQuery)) ||
+                       (g.repairNotes && g.repairNotes.toLowerCase().includes(searchQuery));
+            });
+
+            document.getElementById('watchCount').innerText = watchlist.length;
+            document.getElementById('visibleWatchCount').innerText = filtered.length;
+            container.innerHTML = '';
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full bg-gray-900 border border-gray-800 rounded-xl p-8 text-center text-gray-400 space-y-3">
+                        <i class="fa-solid fa-eye-slash text-3xl text-gray-600"></i>
+                        <p class="text-sm">No watched candidate guitars found.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            filtered.forEach(guitar => {
+                const card = document.createElement('div');
+                card.className = "bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-lg flex flex-col justify-between";
+                
+                const partsBadges = guitar.parts.map(p => `<span class="text-[10px] bg-gray-950 border border-gray-800 px-2 py-0.5 rounded text-gray-300">${p.name} (${formatLKR(p.cost)})</span>`).join(' ');
+
+                card.innerHTML = `
+                    <div>
+                        <div class="relative h-48 bg-gray-950">
+                            <img src="${guitar.images[0]}" class="w-full h-full object-cover">
+                            <div class="absolute top-3 left-3 bg-sky-500/90 text-gray-950 text-xs font-bold px-2.5 py-1 rounded-md shadow">
+                                <i class="fa-solid fa-eye mr-1"></i> Watchlist Prospect
+                            </div>
+                            <div class="absolute bottom-3 right-3 bg-gray-950/80 backdrop-blur text-gray-300 text-[10px] px-2 py-1 rounded">
+                                <i class="fa-solid fa-location-dot text-amber-500 mr-1"></i>${guitar.locationCity || 'Sri Lanka'}
+                            </div>
+                        </div>
+
+                        <div class="p-5 space-y-4">
+                            <div>
+                                <h3 class="text-lg font-bold text-white">${guitar.brand} ${guitar.model}</h3>
+                                <p class="text-xs text-gray-400">Source: <span class="text-amber-400 font-medium">${guitar.sourcingChannel}</span></p>
+                            </div>
+
+                            <div class="bg-gray-950 p-3 rounded-lg border border-gray-800/80 space-y-1.5 text-xs">
+                                <div class="flex justify-between text-gray-400">
+                                    <span>Asking Price:</span>
+                                    <span class="font-semibold text-white">${formatLKR(guitar.purchasePrice)}</span>
+                                </div>
+                                <div class="flex justify-between text-gray-400">
+                                    <span>Est. Parts/Accessories:</span>
+                                    <span class="font-semibold text-gray-300">${formatLKR(guitar.totalExpense - guitar.purchasePrice)}</span>
+                                </div>
+                                <div class="flex justify-between text-gray-400 pt-1 border-t border-gray-800">
+                                    <span>Total Est. Investment:</span>
+                                    <span class="font-semibold text-sky-400">${formatLKR(guitar.totalExpense)}</span>
+                                </div>
+                                <div class="flex justify-between text-gray-400 font-bold pt-1 border-t border-gray-800">
+                                    <span>Target Selling Price:</span>
+                                    <span class="text-emerald-400">${formatLKR(guitar.targetSellingPrice)}</span>
+                                </div>
+                            </div>
+
+                            ${partsBadges ? `<div class="flex flex-wrap gap-1">${partsBadges}</div>` : ''}
+
+                            ${guitar.repairNotes ? `
+                                <div class="text-xs text-gray-400 bg-gray-950/50 p-2.5 rounded border border-gray-800/50">
+                                    <span class="text-gray-500 font-semibold block text-[10px] uppercase">Inspection Notes:</span>
+                                    ${guitar.repairNotes}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <div class="p-5 pt-0 flex gap-2">
+                        <button onclick="promoteToInventory('${guitar.id}')" class="w-full bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold py-2 text-xs rounded-lg shadow flex items-center justify-center gap-1.5 transition">
+                            <i class="fa-solid fa-cart-shopping"></i> Purchased! Move to Workshop
+                        </button>
+                        <button onclick="deleteWatchlist('${guitar.id}')" class="px-3 py-2 bg-gray-800 hover:bg-red-900/40 text-red-400 rounded-lg text-xs">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function promoteToInventory(id) {
+            const item = watchlist.find(w => w.id === id);
+            if (!item) return;
+
+            watchlist = watchlist.filter(w => w.id !== id);
+            item.status = 'In Repair';
+            inventory.push(item);
+
+            saveToLocalStorage();
+            renderWatchlist();
+            renderInventory();
+            updateAnalytics();
+            switchTab('inventory');
+        }
+
+        function deleteWatchlist(id) {
+            watchlist = watchlist.filter(w => w.id !== id);
+            saveToLocalStorage();
+            renderWatchlist();
+        }
+
+        function renderInventory() {
+            const container = document.getElementById('inventoryContainer');
+            if (!container) return;
+
+            const searchQuery = document.getElementById('searchInventory') ? document.getElementById('searchInventory').value.toLowerCase() : '';
+            const statusFilter = document.getElementById('filterStatus') ? document.getElementById('filterStatus').value : 'ALL';
+
+            const filtered = inventory.filter(g => {
+                const matchesSearch = g.brand.toLowerCase().includes(searchQuery) ||
+                                      g.model.toLowerCase().includes(searchQuery) ||
+                                      (g.repairNotes && g.repairNotes.toLowerCase().includes(searchQuery));
+                const matchesStatus = statusFilter === 'ALL' || g.status === statusFilter;
+                return matchesSearch && matchesStatus;
+            });
+
+            document.getElementById('invCount').innerText = inventory.length;
+            document.getElementById('visibleCount').innerText = filtered.length;
+            container.innerHTML = '';
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full bg-gray-900 border border-gray-800 rounded-xl p-8 text-center text-gray-400 space-y-3">
+                        <i class="fa-solid fa-box-open text-3xl text-gray-600"></i>
+                        <p class="text-sm">No instruments found matching your active filters.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            filtered.forEach(guitar => {
+                const card = document.createElement('div');
+                card.className = "bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-lg flex flex-col justify-between";
+                
+                let statusBadge = '';
+                if (guitar.status === 'In Repair') {
+                    statusBadge = `<span class="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs px-2.5 py-1 rounded-full font-medium"><i class="fa-solid fa-screwdriver-wrench mr-1"></i> In Repair</span>`;
+                } else if (guitar.status === 'Ready for Sale') {
+                    statusBadge = `<span class="bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-xs px-2.5 py-1 rounded-full font-medium"><i class="fa-solid fa-tag mr-1"></i> Ready for Sale</span>`;
+                } else if (guitar.status === 'Sold') {
+                    statusBadge = `<span class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-full font-medium"><i class="fa-solid fa-circle-check mr-1"></i> Sold</span>`;
+                }
+
+                const partsBadges = guitar.parts.map(p => `<span class="text-[10px] bg-gray-950 border border-gray-800 px-2 py-0.5 rounded text-gray-300">${p.name} (${formatLKR(p.cost)})</span>`).join(' ');
+
+                let profitSection = '';
+                if (guitar.status === 'Sold' && guitar.saleDetails) {
+                    const netProfit = guitar.saleDetails.actualPrice - guitar.saleDetails.fees - guitar.totalExpense;
+                    const profitClass = netProfit >= 0 ? 'text-emerald-400' : 'text-red-400';
+                    profitSection = `
+                        <div class="bg-gray-950 p-3 rounded-lg border border-gray-800 space-y-1 text-xs">
+                            <div class="flex justify-between text-gray-400"><span>Actual Resale:</span> <span class="font-semibold text-white">${formatLKR(guitar.saleDetails.actualPrice)}</span></div>
+                            <div class="flex justify-between text-gray-400"><span>Courier/Fees:</span> <span class="font-semibold text-gray-400">${formatLKR(guitar.saleDetails.fees)}</span></div>
+                            <div class="flex justify-between text-gray-400 font-bold pt-1 border-t border-gray-800">
+                                <span>Realized Profit:</span> 
+                                <span class="${profitClass}">${formatLKR(netProfit)}</span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    profitSection = `
+                        <div class="bg-gray-950 p-3 rounded-lg border border-gray-800 space-y-1 text-xs">
+                            <div class="flex justify-between text-gray-400"><span>Total Investment:</span> <span class="font-semibold text-white">${formatLKR(guitar.totalExpense)}</span></div>
+                            <div class="flex justify-between text-gray-400"><span>Target Resale Price:</span> <span class="font-semibold text-amber-400">${formatLKR(guitar.targetSellingPrice)}</span></div>
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <div>
+                        <div class="relative h-48 bg-gray-950">
+                            <img src="${guitar.images[0]}" class="w-full h-full object-cover">
+                            <div class="absolute top-3 right-3">${statusBadge}</div>
+                            <div class="absolute bottom-3 left-3 bg-gray-950/80 backdrop-blur text-gray-300 text-[10px] px-2 py-1 rounded">
+                                <i class="fa-solid fa-location-dot text-amber-500 mr-1"></i>${guitar.locationCity || 'Sri Lanka'}
+                            </div>
+                        </div>
+
+                        <div class="p-5 space-y-4">
+                            <div>
+                                <h3 class="text-lg font-bold text-white">${guitar.brand} ${guitar.model}</h3>
+                                <p class="text-xs text-gray-400">Sourced from: <span class="text-amber-400 font-medium">${guitar.sourcingChannel}</span></p>
+                            </div>
+
+                            ${profitSection}
+
+                            ${partsBadges ? `<div class="flex flex-wrap gap-1">${partsBadges}</div>` : ''}
+
+                            ${guitar.repairNotes ? `
+                                <div class="text-xs text-gray-400 bg-gray-950/50 p-2.5 rounded border border-gray-800/50">
+                                    <span class="text-gray-500 font-semibold block text-[10px] uppercase">Workbench Notes:</span>
+                                    ${guitar.repairNotes}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <div class="p-5 pt-0 space-y-2">
+                        ${guitar.status !== 'Sold' ? `
+                            <div class="grid grid-cols-2 gap-2">
+                                <select onchange="updateStatus('${guitar.id}', this.value)" class="bg-gray-950 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500">
+                                    <option value="In Repair" ${guitar.status === 'In Repair' ? 'selected' : ''}>In Repair</option>
+                                    <option value="Ready for Sale" ${guitar.status === 'Ready for Sale' ? 'selected' : ''}>Ready for Sale</option>
+                                </select>
+                                <button onclick="openSoldModal('${guitar.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-gray-950 font-bold py-1.5 px-3 rounded-lg text-xs shadow transition">
+                                    <i class="fa-solid fa-dollar-sign"></i> Mark Sold
+                                </button>
+                            </div>
+                        ` : ''}
+                        <button onclick="deleteInventory('${guitar.id}')" class="w-full text-xs text-red-400 hover:text-red-300 py-1">
+                            <i class="fa-solid fa-trash mr-1"></i> Remove Entry
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function updateStatus(id, newStatus) {
+            const item = inventory.find(g => g.id === id);
+            if (item) {
+                item.status = newStatus;
+                saveToLocalStorage();
+                renderInventory();
+            }
+        }
+
+        function deleteInventory(id) {
+            inventory = inventory.filter(g => g.id !== id);
+            saveToLocalStorage();
+            renderInventory();
+            updateAnalytics();
+        }
+
+        function openSoldModal(id) {
+            selectedGuitarIdForSale = id;
+            const guitar = inventory.find(g => g.id === id);
+            if (guitar) {
+                document.getElementById('modalSalePrice').value = guitar.targetSellingPrice;
+            }
+            document.getElementById('soldModal').classList.remove('hidden');
+        }
+
+        function closeSoldModal() {
+            selectedGuitarIdForSale = null;
+            document.getElementById('soldModal').classList.add('hidden');
+        }
+
+        function saveGuitarSale() {
+            if (!selectedGuitarIdForSale) return;
+            const actualPrice = parseFloat(document.getElementById('modalSalePrice').value) || 0;
+            const fees = parseFloat(document.getElementById('modalFees').value) || 0;
+            const saleDate = document.getElementById('modalSaleDate').value;
+            const notes = document.getElementById('modalBuyerNotes').value.trim();
+
+            const item = inventory.find(g => g.id === selectedGuitarIdForSale);
+            if (item) {
+                item.status = 'Sold';
+                item.saleDetails = { actualPrice, fees, saleDate, notes };
+                saveToLocalStorage();
+                closeSoldModal();
+                renderInventory();
+                updateAnalytics();
+            }
+        }
+
+        // --- ANALYTICS DASHBOARD ---
+        function updateAnalytics() {
+            let totalInvested = 0;
+            let totalRevenue = 0;
+            let totalProfit = 0;
+            let soldCount = 0;
+
+            inventory.forEach(g => {
+                totalInvested += g.totalExpense;
+                if (g.status === 'Sold' && g.saleDetails) {
+                    soldCount++;
+                    const rev = g.saleDetails.actualPrice;
+                    const profit = rev - g.saleDetails.fees - g.totalExpense;
+                    totalRevenue += rev;
+                    totalProfit += profit;
+                }
+            });
+
+            document.getElementById('metricInvested').innerText = formatLKR(totalInvested);
+            document.getElementById('metricRevenue').innerText = formatLKR(totalRevenue);
+            document.getElementById('metricProfit').innerText = formatLKR(totalProfit);
+            document.getElementById('metricCount').innerText = soldCount;
+
+            const avgROI = totalInvested > 0 ? ((totalProfit / totalInvested) * 100).toFixed(1) : 0;
+            document.getElementById('metricROI').innerText = `${avgROI}%`;
+
+            renderSourcingTable();
+            renderCharts();
+        }
+
+        function renderSourcingTable() {
+            const tbody = document.getElementById('sourcingTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            const channels = {};
+
+            [...inventory, ...watchlist].forEach(g => {
+                const ch = g.sourcingChannel || 'Other / Direct';
+                if (!channels[ch]) {
+                    channels[ch] = { bought: 0, sold: 0, invested: 0, profit: 0 };
+                }
+                channels[ch].bought++;
+                channels[ch].invested += g.totalExpense;
+
+                if (g.status === 'Sold' && g.saleDetails) {
+                    channels[ch].sold++;
+                    const p = g.saleDetails.actualPrice - g.saleDetails.fees - g.totalExpense;
+                    channels[ch].profit += p;
+                }
+            });
+
+            const keys = Object.keys(channels);
+            if (keys.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="py-4 text-center text-gray-500">No sourcing data logged yet.</td></tr>`;
+                return;
+            }
+
+            keys.forEach(ch => {
+                const data = channels[ch];
+                const roi = data.invested > 0 ? ((data.profit / data.invested) * 100).toFixed(1) : 0;
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-800/40 transition";
+                tr.innerHTML = `
+                    <td class="py-2.5 font-medium text-white">${ch}</td>
+                    <td class="py-2.5 text-center text-gray-300">${data.bought}</td>
+                    <td class="py-2.5 text-center text-gray-300">${data.sold}</td>
+                    <td class="py-2.5 text-right font-mono text-gray-300">${formatLKR(data.invested)}</td>
+                    <td class="py-2.5 text-right font-mono ${data.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}">${formatLKR(data.profit)}</td>
+                    <td class="py-2.5 text-right font-semibold text-amber-400">${roi}%</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderCharts() {
+            const soldGuitars = inventory.filter(g => g.status === 'Sold' && g.saleDetails);
+
+            // Bar Chart
+            const barCtx = document.getElementById('chartProfitPerGuitar');
+            if (barCtx) {
+                if (barChartInstance) barChartInstance.destroy();
+                
+                const labels = soldGuitars.map(g => `${g.brand} ${g.model}`);
+                const data = soldGuitars.map(g => g.saleDetails.actualPrice - g.saleDetails.fees - g.totalExpense);
+
+                barChartInstance = new Chart(barCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels.length > 0 ? labels : ['No Sales Yet'],
+                        datasets: [{
+                            label: 'Net Profit (LKR)',
+                            data: data.length > 0 ? data : [0],
+                            backgroundColor: '#10b981',
+                            borderRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { ticks: { color: '#9ca3af' }, grid: { color: '#1f2937' } },
+                            x: { ticks: { color: '#9ca3af' }, grid: { display: false } }
+                        }
+                    }
+                });
+            }
+
+            // Pie Chart
+            const pieCtx = document.getElementById('chartCapitalBreakdown');
+            if (pieCtx) {
+                if (pieChartInstance) pieChartInstance.destroy();
+
+                let totalPurchase = 0;
+                let totalParts = 0;
+                inventory.forEach(g => {
+                    totalPurchase += g.purchasePrice;
+                    totalParts += (g.totalExpense - g.purchasePrice);
+                });
+
+                pieChartInstance = new Chart(pieCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Initial Guitar Purchase', 'Parts & Accessories'],
+                        datasets: [{
+                            data: [totalPurchase, totalParts],
+                            backgroundColor: ['#f59e0b', '#38bdf8'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: '#9ca3af', font: { size: 11 } } }
+                        }
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+</html>
